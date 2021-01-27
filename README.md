@@ -10,8 +10,8 @@ filters for finding them using Distance Filters.
 •
 Users can also find shortest route and navigation to their selected Destination.
 --------------------
-Front end = HTML + CSS + Embedded Javascript Templating (EJS) + Mapbox (To display the map)
-Back end = NodeJS + ExpressJS
+Front end = HTML + CSS + Embedded Javascript Templating (EJS) + Mapbox (To display the map) ||
+Back end = NodeJS + ExpressJS ||
 Database = Neo4j graph database handler
 --------------------
 TOOLS
