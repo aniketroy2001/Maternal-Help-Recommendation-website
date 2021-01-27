@@ -11,7 +11,7 @@ var expressValidator = require('express-validator');
 var flash = require('express-flash');
 var session1 = require('express-session');
 var app = express();
-var driver = neo4j.driver('bolt://localhost', neo4j.auth.basic('Aniket','panda2009'));
+var driver = neo4j.driver('bolt://localhost', neo4j.auth.basic('Putyourownname','putyourownpasswordasenteredwhencreating_new_neo4jdatabase'));
 var session = driver.session();
 
 //view engine
@@ -60,43 +60,10 @@ app.get('/contact', function(req,res){
 app.get('/permission', function(req,res){
     res.render("permission");
 })
-// app.post('/search',function(req,res){
-//     var searchval = req.body.search_item;
 
-//     session
-//         .run('MATCH (n:Hospital) WHERE toLower(n.name) CONTAINS toLower($UserNameParam) RETURN n',{UserNameParam:searchval})
-//         .then(function(result){
-//             var nameArr = [];
-//             for(let i=0;i<result.records.length;i++){
-//                 nameArr.push({
-//                     name: result.records[i]._fields[0].properties.name
-//                 });
-//             };
-//             res.render("search", {
-//                 names: nameArr
-//             });
-//         })
-//         run("MATCH (n:Nanny) WHERE toLower(n.name) CONTAINS toLower($UserNameParam) RETURN n",{UserNameParam:searchval})
-//         .then(function(result){
-//             var nameArr = [];
-//             for(let i=0;i<result.records.length;i++){
-//                 nameArr.push({
-//                     name: result.records[i]._fields[0].properties.name
-//                 });
-//             };
-//             res.render("search", {
-//                 names: nameArr
-//             });
-//         })
-//         .catch(function(err){
-//             if(err){
-//                 console.log(err);
-//             }
-//         })
-// }); 
 app.get('/regionhospitals',function(req,res){
      session
-         .run('MATCH (h:Hospital) WHERE DISTANCE(point({latitude:h.lat,longitude:h.long}),point({latitude:19.037677360774182, longitude:72.92352143390009}))<4000 RETURN h')
+         .run('MATCH (h:Hospital) WHERE DISTANCE(point({latitude:h.lat,longitude:h.long}),point({latitude:, longitude:}))<4000 RETURN h')
          .then(function(result){
              var HospitalArr=[];
              console.log('ok');
@@ -138,7 +105,7 @@ app.get('/regionhospitals',function(req,res){
 });
 app.get('/regiondoctors',function(req,res){
     session
-        .run('MATCH (h:Doctor) WHERE DISTANCE(point({latitude:h.latitude,longitude:h.longitude}),point({latitude:19.037677360774182, longitude:72.92352143390009}))<4000 RETURN h')
+        .run('MATCH (h:Doctor) WHERE DISTANCE(point({latitude:h.latitude,longitude:h.longitude}),point({latitude:, longitude:}))<4000 RETURN h')
         .then(function(result){
             var DoctorArr=[];
             console.log('ok');
