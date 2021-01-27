@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title>Get driving directions from one location to another</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.44.2/mapbox-gl.js'></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.44.2/mapbox-gl.css' rel='stylesheet' />
+
+    <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v2.3.0/mapbox-gl-geocoder.min.js'></script>
+    <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-geocoder/v2.3.0/mapbox-gl-geocoder.css' type='text/css' />
+    <script src='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.0.0/mapbox-gl-draw.js'></script>
+    <link rel='stylesheet' href='https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.0.0/mapbox-gl-draw.css' type='text/css'/>
+    <style>
+        body { margin:0; padding:0; }
+        #map { position:absolute; top:0; bottom:0; width:100%; height: 100%}
+        .marker {
+          background-image: url('https://spng.subpng.com/20180905/awv/kisspng-computer-icons-realmsheni-sunstar-precision-forge-hospital-svg-png-icon-free-download-465536-on-5b9025c274c178.4742360115361735064782.jpg');
+          background-size: cover;
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          cursor: pointer;
+          padding:0;
+        }
+        .marker2 {
+          background-image: url('https://www.pinclipart.com/picdir/middle/104-1043664_doctor-male-icon-doctor-icon-transparent-background-clipart.png');
+          background-size: cover;
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          cursor: pointer;
+          padding:0;
+        }
+        .marker3{
+          background-image: url('https://www.nicepng.com/png/detail/15-159490_small-google-maps-marker-blue.png');
+          background-size: cover;
+          width: 50px;
+          height: 50px;
+          border-radius: 50%;
+          cursor: pointer;
+          padding:0;
+        }
+        .mapboxgl-popup {
+          max-width: 200px;
+        }
+
+        .mapboxgl-popup-content {
+          text-align: center;
+          font-family: 'Open Sans', sans-serif;
+        }
+    </style>
+</head>
+<body>
+<style>
+    .geocoder {
+        height: 100px;
+        width: 150px;
+        position: absolute;
+        top: 20px;
+        left: 10px;
+        background-color: rgba(255, 255, 255, .9);
+        padding: 15px;
+        text-align: left;
+        font-family: 'Arial';
+        margin: 0;
+        font-size: 13px;
+    }
+    #instructions {
+        position:absolute;
+        height: 300px;
+        margin:20px;
+        width: 20%;
+        top:0;
+        bottom:0;
+        padding: 20px;
+        background-color: rgba(255,255,255,0.9);
+        overflow-y: scroll;
+        font-family: sans-serif;
+    }
+
+</style>
+
+<!--  the map -->
+<div id='map'></div>
+<!-- geocoder search input -->
+<div class="geocoder">
+    <div id="geocoder" ></div>
+</div>
+<!-- left side instructions -->
+<div id='instructions'>
+    <div id="calculated-line"></div>
+</div>
+
+
+<script>
+    
+    mapboxgl.accessToken = 'pk.eyJ1IjoiZmFraHIiLCJhIjoiY2pseXc0djE0MHBibzN2b2h4MzVoZjk4aSJ9.ImbyLtfsfSsR_yyBluR8yQ';
+    var instructions = document.getElementById('instructions');
+    var map = new mapboxgl.Map({
+        container: 'map', // container id
+        style: 'mapbox://styles/mapbox/streets-v9', //hosted style id
+        center: [72.9147190614618,19.0430900568964], // starting position
+        zoom: 13, // starting zoom
+        minZoom: 9 // keep it local
+    });
+    // Add geolocate control to the map.
+    map.addControl(
+    new mapboxgl.GeolocateControl({
+    positionOptions: {
+    enableHighAccuracy: true
+    },
+    trackUserLocation: true
+    })
+    );
+    //  geocoder here
+    var geocoder = new MapboxGeocoder({
+        accessToken: mapboxgl.accessToken,
+        // limit results to Australia
+        //country: 'IN',
+    });
+
+    // After the map style has loaded on the page, add a source layer and default
+    // styling for a single point.
+    map.on('load', function() {
+        // Listen for the `result` event from the MapboxGeocoder that is triggered when a user
+        // makes a selection and add a symbol that matches the result.
+        geocoder.on('result', function(ev) {
+            console.log(ev.result.center);
+
+        });
+    });
+    var draw = new MapboxDraw({
+        displayControlsDefault: false,
+        controls: {
+            line_string: true,
+            trash: true
+        },
+        styles: [
+            // ACTIVE (being drawn)
+            // line stroke
+            {
+                "id": "gl-draw-line",
+                "type": "line",
+                "filter": ["all", ["==", "$type", "LineString"], ["!=", "mode", "static"]],
+                "layout": {
+                    "line-cap": "round",
+                    "line-join": "round"
+                },
+                "paint": {
+                    "line-color": "#3b9ddd",
+                    "line-dasharray": [0.2, 2],
+                    "line-width": 4,
+                    "line-opacity": 0.7
+                }
+            },
+            // vertex point halos
+            {
+                "id": "gl-draw-polygon-and-line-vertex-halo-active",
+                "type": "circle",
+                "filter": ["all", ["==", "meta", "vertex"], ["==", "$type", "Point"], ["!=", "mode", "static"]],
+                "paint": {
+                    "circle-radius": 10,
+                    "circle-color": "#FFF"
+                }
+            },
+            // vertex points
+            {
+                "id": "gl-draw-polygon-and-line-vertex-active",
+                "type": "circle",
+                "filter": ["all", ["==", "meta", "vertex"], ["==", "$type", "Point"], ["!=", "mode", "static"]],
+                "paint": {
+                    "circle-radius": 6,
+                    "circle-color": "#3b9ddd",
+                }
+            },
+        ]
+    });
+    // add the draw tool to the map
+    map.addControl(draw);
+
+    // add create, update, or delete actions
+    map.on('draw.create', updateRoute);
+    map.on('draw.update', updateRoute);
+    map.on('draw.delete', removeRoute);
+
+    // use the coordinates you just drew to make your directions request
+    function updateRoute() {
+        removeRoute(); // overwrite any existing layers
+        var data = draw.getAll();
+        var lastFeature = data.features.length - 1;
+        var coords = data.features[lastFeature].geometry.coordinates;
+        var newCoords = coords.join(';');
+        getMatch(newCoords);
+    }
+
+    // make a directions request
+    function getMatch(e) {
+        var url = 'https://api.mapbox.com/directions/v5/mapbox/cycling/' + e
+            +'?geometries=geojson&steps=true&access_token=' + mapboxgl.accessToken;
+        var req = new XMLHttpRequest();
+        req.responseType = 'json';
+        req.open('GET', url, true);
+        req.onload  = function() {
+            var jsonResponse = req.response;
+            var distance = jsonResponse.routes[0].distance*0.001;
+            var duration = jsonResponse.routes[0].duration/60;
+            var steps = jsonResponse.routes[0].legs[0].steps;
+            var coords = jsonResponse.routes[0].geometry;
+          //  console.log(steps);
+        console.log(coords);
+         //  console.log(distance);
+          // console.log(duration);
+
+            // get route directions on load map
+            steps.forEach(function(step){
+                instructions.insertAdjacentHTML('beforeend', '<p>' + step.maneuver.instruction + '</p>');
+            });
+            // get distance and duration
+            instructions.insertAdjacentHTML('beforeend', '<p>' +  'Distance: ' + distance.toFixed(2) + ' km<br>Duration: ' + duration.toFixed(2) + ' minutes' + '</p>');
+
+            // add the route to the map
+            addRoute(coords);
+          //  console.log(coordinates);
+
+        };
+        req.send();
+    }
+
+    // adds the route as a layer on the map
+    function addRoute (coords) {
+        // check if the route is already loaded
+        if (map.getSource('route')) {
+            map.removeLayer('route');
+            map.removeSource('route')
+        } else{
+            map.addLayer({
+                "id": "route",
+                "type": "line",
+                "source": {
+                    "type": "geojson",
+                    "data": {
+                        "type": "Feature",
+                        "properties": {},
+                        "geometry": coords
+                    }
+                },
+                "layout": {
+                    "line-join": "round",
+                    "line-cap": "round"
+                },
+                "paint": {
+                    "line-color": "#1db7dd",
+                    "line-width": 8,
+                    "line-opacity": 0.8
+                }
+            });
+        };
+    }
+
+    // remove the layer if it exists
+    function removeRoute () {
+        if (map.getSource('route')) {
+            map.removeLayer('route');
+            map.removeSource('route');
+            instructions.innerHTML = '';
+        } else  {
+            return;
+        }
+    }
+    document.getElementById('geocoder').appendChild(geocoder.onAdd(map));
+    var geojson ={
+      type: "FeatureCollection",
+      features: [{
+      
+        type: "Feature",
+        geometry: {
+          type: "Point",
+          coordinates:  [ 72.91471906,19.04309006 ]
+        },
+        properties: {
+        name:"BARC HOSPITAL  ",
+        FIELD4:"",
+        FIELD5:"",
+        phone:"022 2559 8200"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.91107424,19.04776339 ]
+        },
+        "properties": {
+        "name":"Apollo spectra hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 4344 4600"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.89746121,19.04133826 ]
+        },
+        "properties": {
+        "name":"RCF Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 2552 3444"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.8976829,19.05679204 ]
+        },
+        "properties": {
+        "name":"Joy Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":""
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.93528899,19.05333362 ]
+        },
+        "properties": {
+        "name":"Sagar Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":""
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.92747839,19.05540239 ]
+        },
+        "properties": {
+        "name":"Hrishikesh Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"9029882580"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.92782172,19.05390152 ]
+        },
+        "properties": {
+        "name":"Lallu Bhai",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"8779743277"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.93393769,19.05070873 ]
+        },
+        "properties": {
+        "name":"Vishwakarma Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":""
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.93554768,19.05289918 ]
+        },
+        "properties": {
+        "name":"V Care Children Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 2551 2233"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.9144761,19.04820704 ]
+        },
+        "properties": {
+        "name":"Sanjeevani Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 2525 5008"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.90920019,19.05264256 ]
+        },
+        "properties": {
+        "name":"Ashirwad Hospital, Blessing For Life",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"8655887701"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.91486502,19.05501556 ]
+        },
+        "properties": {
+        "name":"Kailash Jeevan Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":""
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.9120326,19.05708431 ]
+        },
+        "properties": {
+        "name":"Jai Hind Hospital & ICCU",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"7303706050"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.8906026,19.05765092 ]
+        },
+        "properties": {
+        "name":"Mangal Anand Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 2522 4845"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.89111758,19.05537937 ]
+        },
+        "properties": {
+        "name":"Sai Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 2527 1752"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.88708354,19.05420302 ]
+        },
+        "properties": {
+        "name":"Surana Sethia Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 3378 3378"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.88944388,19.05720473 ]
+        },
+        "properties": {
+        "name":"Sushrut Hospital & Research Centre",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 2526 5555"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.89673949,19.05659628 ]
+        },
+        "properties": {
+        "name":"Zen Multi Speciality Hospital in Mumbai",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 2526 5731"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.8897872,19.05716416 ]
+        },
+        "properties": {
+        "name":"Chembur Hospital Project Trust",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 2526 5500"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.89626742,19.03339237 ]
+        },
+        "properties": {
+        "name":"???? ????????",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 2528 3160"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.86138713,19.01344132 ]
+        },
+        "properties": {
+        "name":"Mumbai Port Trust Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 6656 7658"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.84267604,19.04703317 ]
+        },
+        "properties": {
+        "name":"S L Raheja Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"8956087400"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.83872783,19.03441674 ]
+        },
+        "properties": {
+        "name":"P. D. Hinduja National Hospital & Medical Research Centre",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 2445 1515"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.83907115,19.03250999 ]
+        },
+        "properties": {
+        "name":"Hinduja Hospital Lalita Girdhar",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"022 2444 9199"
+        }
+      },
+      {
+        "type": "Feature",
+        "geometry": {
+          "type": "Point",
+          "coordinates":  [ 72.89429626,19.04280655 ]
+        },
+        "properties": {
+        "name":"Chandra Maternity Hospital",
+        "FIELD4":"",
+        "FIELD5":"",
+        "phone":"2225546404"
+        }
+      }]
+    };
+// add markers to map
+geojson.features.forEach(function(marker) {
+
+// create a HTML element for each feature
+var el = document.createElement('div');
+el.className = 'marker';
+
+// make a marker for each feature and add to the map
+new mapboxgl.Marker(el)
+  .setLngLat(marker.geometry.coordinates)
+  new mapboxgl.Marker(el)
+  .setLngLat(marker.geometry.coordinates)
+  .setPopup(new mapboxgl.Popup({ offset: 25 }) // add popups
+    .setHTML('<h3>' + marker.properties.name + '</h3><p>' + marker.properties.phone + '</p>'))
+  .addTo(map);
+});
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+var geojson2 ={
+  type: "FeatureCollection",
+    features: [
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.85668481,19.05387502 ]
+    },
+    "properties": {
+    "Sr. No":1,
+    "Name":"Dr. Naman",
+    "Phone":"(545) 232-9152"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.84114097,19.0447079 ]
+    },
+    "properties": {
+    "Sr. No":2,
+    "Name":"Dr.Sasha",
+    "Phone":"(736) 249-3232"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.88124297,19.04436481 ]
+    },
+    "properties": {
+    "Sr. No":3,
+    "Name":"Dr.Gopal",
+    "Phone":"(923) 652-1122"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.89786336,19.04650934 ]
+    },
+    "properties": {
+    "Sr. No":4,
+    "Name":"Dr.Jethalal",
+    "Phone":"(815) 166-2444"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.82528794,19.0484697 ]
+    },
+    "properties": {
+    "Sr. No":5,
+    "Name":"Dr. Aman",
+    "Phone":"(941) 344-1215"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.85941134,19.04107615 ]
+    },
+    "properties": {
+    "Sr. No":6,
+    "Name":"Dr.Jain",
+    "Phone":"(520) 272-5211"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.95009281,19.04492481 ]
+    },
+    "properties": {
+    "Sr. No":7,
+    "Name":"Dr.Costarica",
+    "Phone":"(677) 111-2229"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.91835933,19.06259505 ]
+    },
+    "properties": {
+    "Sr. No":8,
+    "Name":"Dr.Roy",
+    "Phone":"(805) 622-1633"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.89518696,19.0625275 ]
+    },
+    "properties": {
+    "Sr. No":9,
+    "Name":"Dr.amaterasu",
+    "Phone":"(672) 114-7633"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.88394307,19.0626943 ]
+    },
+    "properties": {
+    "Sr. No":10,
+    "Name":"Dr.Anindita",
+    "Phone":"(391) 963-0433"
+    }
+  }]
+};
+// add markers to map
+geojson2.features.forEach(function(marker2) {
+
+// create a HTML element for each feature
+var el = document.createElement('div');
+el.className = 'marker2';
+
+// make a marker for each feature and add to the map
+new mapboxgl.Marker(el)
+  .setLngLat(marker2.geometry.coordinates)
+  new mapboxgl.Marker(el)
+  .setLngLat(marker2.geometry.coordinates)
+  .setPopup(new mapboxgl.Popup({ offset: 25 }) // add popups
+    .setHTML('<h3>' + marker2.properties.Name + '</h3><p>' + marker2.properties.Phone + '</p>'))
+  .addTo(map);
+});
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+var geojson3 ={
+  "type": "FeatureCollection",
+   "features": [{
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.91669481,19.04388502 ]
+    },
+    "properties": {
+    "Sr. No":1,
+    "Name":"Nancy John",
+    "Phone":"(545) 700-9152",
+    "Rating":"5 star"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.91465097,19.0448079 ]
+    },
+    "properties": {
+    "Sr. No":2,
+    "Name":"Snow White",
+    "Phone":"(736) 249-3869",
+    "Rating":"4 star"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.91124297,19.04437481 ]
+    },
+    "properties": {
+    "Sr. No":3,
+    "Name":"Laxmi Rani",
+    "Phone":"(923) 672-1144",
+    "Rating":"3 star"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.91786336,19.04650934 ]
+    },
+    "properties": {
+    "Sr. No":4,
+    "Name":"Shoba Das",
+    "Phone":"(815) 766-2709",
+    "Rating":"4 star"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.92528724,19.0482697 ]
+    },
+    "properties": {
+    "Sr. No":5,
+    "Name":"Shivani Devbrabhu",
+    "Phone":"(941) 315-6715",
+    "Rating":"2 star"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.89941134,19.04107695 ]
+    },
+    "properties": {
+    "Sr. No":6,
+    "Name":"Shruti Jain",
+    "Phone":"(520) 279-5264",
+    "Rating":"5 star"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.94009389,19.04892681 ]
+    },
+    "properties": {
+    "Sr. No":7,
+    "Name":"Himanshu Dcosta",
+    "Phone":"(677) 801-2859",
+    "Rating":"4 star"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.91835133,19.06559505 ]
+    },
+    "properties": {
+    "Sr. No":8,
+    "Name":"Joy J",
+    "Phone":"(805) 632-1686",
+    "Rating":"5 star"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.89538696,19.0689285 ]
+    },
+    "properties": {
+    "Sr. No":9,
+    "Name":"Varun T",
+    "Phone":"(672) 294-7601",
+    "Rating":"2 star"
+    }
+  },
+  {
+    "type": "Feature",
+    "geometry": {
+       "type": "Point",
+       "coordinates":  [ 72.88394397,19.05752043 ]
+    },
+    "properties": {
+    "Sr. No":10,
+    "Name":"Sister Abel",
+    "Phone":"(301) 963-0427",
+    "Rating":"3 star"
+    }
+  }]
+};
+///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// add markers to map
+geojson3.features.forEach(function(marker3) {
+
+// create a HTML element for each feature
+var el = document.createElement('div');
+el.className = 'marker3';
+
+// make a marker for each feature and add to the map
+new mapboxgl.Marker(el)
+  .setLngLat(marker3.geometry.coordinates)
+  new mapboxgl.Marker(el)
+  .setLngLat(marker3.geometry.coordinates)
+  .setPopup(new mapboxgl.Popup({ offset: 25 }) // add popups
+    .setHTML('<h3>' + marker3.properties.Name + '</h3><p>' + marker3.properties.Rating+ '</p>'))
+  .addTo(map);
+});
+
+
+</script>
+
+</body>
+</html>
